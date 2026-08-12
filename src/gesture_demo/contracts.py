@@ -19,7 +19,6 @@ class GestureState:
 # 關節點
 @dataclass
 class HandLandmarks:
-    hand_detected: bool
     landmarks: list[tuple[float, float, float]]
 
 # 事件觸發

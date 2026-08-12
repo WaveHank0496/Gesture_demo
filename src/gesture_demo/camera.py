@@ -10,6 +10,7 @@ class Camera:
         success, frame = self.capture.read()
         if not success:
             raise RuntimeError("讀取攝影機失敗")
+        frame = cv2.flip(frame, 1)
         return frame
 
     def release(self):
