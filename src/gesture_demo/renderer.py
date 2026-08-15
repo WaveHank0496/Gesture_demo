@@ -4,6 +4,8 @@ from src.gesture_demo.detector import HandDetector
 from src.gesture_demo.contracts import HandLandmarks
 from src.gesture_demo.smoother import Smoother
 from src.gesture_demo.recognizer import recognize
+from src.gesture_demo.interaction.trigger import PinchTrigger
+from src.gesture_demo.contracts import HandLandmarks, RenderEventType
 
 HAND_CONNECTIONS = [
     (0, 1), (1, 2), (2, 3), (3, 4),        # 拇指
@@ -51,18 +53,26 @@ def draw_gesture_text(frame, state):
     cv2.putText(frame, pinch_text, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
 
     return frame
+
 if __name__ == "__main__":
     from src.gesture_demo.camera import Camera
 
     cam = Camera(0)
     detector = HandDetector()
     smoother = Smoother(alpha=0.5)
+    trigger = PinchTrigger()
 
     while True:
         frame = cam.read()
         hands = detector.detect(frame)
         hands = smoother.smooth(hands)
         state = recognize(hands)
+        command = trigger.process(state)
+
+        # 驗證:只在真的觸發 CLICK 時印
+        if command.event_type == RenderEventType.CLICK:
+            print(f"CLICK! 位置:{command.event_position}")
+
         frame = draw_landmarks(frame, hands)
         frame = draw_gesture_text(frame, state)
 
