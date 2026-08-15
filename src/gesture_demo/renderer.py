@@ -2,6 +2,7 @@ import cv2
 from src.gesture_demo.camera import Camera
 from src.gesture_demo.detector import HandDetector
 from src.gesture_demo.contracts import HandLandmarks
+from src.gesture_demo.smoother import Smoother
 
 HAND_CONNECTIONS = [
     (0, 1), (1, 2), (2, 3), (3, 4),        # 拇指
@@ -41,10 +42,12 @@ if __name__ == "__main__":
 
     cam = Camera(0)
     detector = HandDetector()
+    smoother = Smoother(alpha=0.5)
 
     while True:
         frame = cam.read()
         hands = detector.detect(frame)
+        hands = smoother.smooth(hands)
         frame = draw_landmarks(frame, hands)
 
         cv2.imshow("Render Test", frame)
