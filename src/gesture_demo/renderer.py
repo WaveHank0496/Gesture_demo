@@ -25,8 +25,10 @@ class Renderer:
         self._draw_gesture_text(frame, state)
         # 3. 處理並畫 CLICK 效果
         self._draw_click(frame, command)
-        # 4. 畫盒子
+        # 3. 畫盒子
         self._draw_box(frame, command)   
+        # 3. 畫線
+        self._draw_trail(frame, command)
         return frame
 
     def _draw_landmarks(self, frame, hands):
@@ -75,3 +77,17 @@ class Renderer:
         # 畫一個方塊(以 cx,cy 為中心,邊長 80)
         half = 40
         cv2.rectangle(frame, (cx - half, cy - half), (cx + half, cy + half), (255, 0, 0), -1)
+
+    def _draw_trail(self, frame, command):
+        if command.event_type != RenderEventType.DRAW:
+            return
+        if not command.trail or len(command.trail) < 2:
+            return      # 少於兩點連不成線
+        height, width = frame.shape[:2]
+        # 把相鄰兩點連成線
+        for i in range(len(command.trail) - 1):
+            p1 = command.trail[i]
+            p2 = command.trail[i + 1]
+            x1, y1 = int(p1[0] * width), int(p1[1] * height)
+            x2, y2 = int(p2[0] * width), int(p2[1] * height)
+            cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 255), 3)   # 黃色線

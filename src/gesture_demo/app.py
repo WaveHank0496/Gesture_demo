@@ -6,6 +6,7 @@ from src.gesture_demo.recognizer import recognize
 from src.gesture_demo.renderer import Renderer
 from src.gesture_demo.interaction.trigger import PinchTrigger
 from src.gesture_demo.interaction.grab import GrabDrag
+from src.gesture_demo.interaction.draw import DrawPen
 from src.gesture_demo.contracts import RenderEventType
 
 
@@ -15,8 +16,10 @@ class App:
         self.camera = Camera(0)
         self.detector = HandDetector()
         self.smoother = Smoother(alpha=0.5)
+        #interactions
         # self.interaction = PinchTrigger()
-        self.interaction = GrabDrag()
+        # self.interaction = GrabDrag()
+        self.interaction = DrawPen()
         self.renderer = Renderer()
 
     def run(self):

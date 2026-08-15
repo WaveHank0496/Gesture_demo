@@ -32,3 +32,4 @@ class RenderEventType(Enum):
 class RenderCommand:
     event_type: RenderEventType
     event_position: tuple[float, float]
+    trail: list[tuple[float, float]] = None 
