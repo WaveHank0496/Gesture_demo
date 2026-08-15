@@ -25,6 +25,8 @@ class Renderer:
         self._draw_gesture_text(frame, state)
         # 3. 處理並畫 CLICK 效果
         self._draw_click(frame, command)
+        # 4. 畫盒子
+        self._draw_box(frame, command)   
         return frame
 
     def _draw_landmarks(self, frame, hands):
@@ -62,3 +64,14 @@ class Renderer:
         if self.click_timer > 0 and self.click_pos is not None:
             cv2.circle(frame, self.click_pos, 40, (0, 0, 255), 3)   # 紅色空心圈
             self.click_timer -= 1
+
+    def _draw_box(self, frame, command):
+        if command.event_type != RenderEventType.GRAB:
+            return
+        height, width = frame.shape[:2]
+        # command.event_position 是方塊的正規化位置,轉像素
+        cx = int(command.event_position[0] * width)
+        cy = int(command.event_position[1] * height)
+        # 畫一個方塊(以 cx,cy 為中心,邊長 80)
+        half = 40
+        cv2.rectangle(frame, (cx - half, cy - half), (cx + half, cy + half), (255, 0, 0), -1)

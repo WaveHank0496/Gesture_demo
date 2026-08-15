@@ -5,6 +5,7 @@ from src.gesture_demo.smoother import Smoother
 from src.gesture_demo.recognizer import recognize
 from src.gesture_demo.renderer import Renderer
 from src.gesture_demo.interaction.trigger import PinchTrigger
+from src.gesture_demo.interaction.grab import GrabDrag
 from src.gesture_demo.contracts import RenderEventType
 
 
@@ -14,7 +15,8 @@ class App:
         self.camera = Camera(0)
         self.detector = HandDetector()
         self.smoother = Smoother(alpha=0.5)
-        self.interaction = PinchTrigger()
+        # self.interaction = PinchTrigger()
+        self.interaction = GrabDrag()
         self.renderer = Renderer()
 
     def run(self):
@@ -26,7 +28,7 @@ class App:
             hands = self.smoother.smooth(hands)
             state = recognize(hands)
             command = self.interaction.process(state)
-            
+
             # 渲染
             frame = self.renderer.render(frame, hands, state, command)
             cv2.imshow("Gesture Demo", frame)
