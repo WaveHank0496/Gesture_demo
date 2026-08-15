@@ -4,25 +4,36 @@ from src.gesture_demo.contracts import GestureState, RenderCommand, RenderEventT
 
 class DrawPen(Interaction):
     def __init__(self):
-        self.trail = []      # 累積的軌跡點
+        self.strokes = []
+        self.was_drawing = False    # 上一幀是否在畫
+
 
     def process(self, state: GestureState) -> RenderCommand:
-        # 沒手:不加點,但保留已畫的軌跡
-        if not state.hand_detected:
-            return RenderCommand(
-                event_type=RenderEventType.DRAW,
-                event_position=(0.0, 0.0),
-                trail=self.trail,
-            )
+        is_drawing = state.hand_detected and state.gesture == Gesture.POINT
+        
+        from src.gesture_demo.interaction.base import Interaction
+from src.gesture_demo.contracts import GestureState, RenderCommand, RenderEventType, Gesture
 
-        # 是 POINT 手勢 → 落筆,把食指尖加進軌跡
-        if state.gesture == Gesture.POINT:
-            self.trail.append(state.index_tip)
-            # print(f"trail 長度: {len(self.trail)}")
 
-        # 不是 POINT → 抬筆(什麼都不做,軌跡保留但不新增)
+class DrawPen(Interaction):
+    def __init__(self):
+        self.strokes = []            # 所有筆跡:list of (list of points)
+        self.was_drawing = False     # 上一幀是否在畫(邊緣偵測用)
+
+    def process(self, state: GestureState) -> RenderCommand:
+        is_drawing = state.hand_detected and state.gesture == Gesture.POINT
+
+        if is_drawing:
+            if not self.was_drawing:
+                # 邊緣:從沒畫→開始畫,開一筆新的
+                self.strokes.append([])
+            # 落筆中:把點加進「當前這一筆」(最後一筆)
+            self.strokes[-1].append(state.index_tip)
+
+        self.was_drawing = is_drawing      # 更新狀態(邊緣偵測必備)
+
         return RenderCommand(
             event_type=RenderEventType.DRAW,
-            event_position=state.index_tip,
-            trail=self.trail,
+            event_position=state.index_tip if state.hand_detected else (0.0, 0.0),
+            trail=self.strokes,       # 現在傳的是「多筆」
         )

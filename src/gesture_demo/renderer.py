@@ -81,13 +81,14 @@ class Renderer:
     def _draw_trail(self, frame, command):
         if command.event_type != RenderEventType.DRAW:
             return
-        if not command.trail or len(command.trail) < 2:
-            return      # 少於兩點連不成線
+        if not command.trail:
+            return
         height, width = frame.shape[:2]
-        # 把相鄰兩點連成線
-        for i in range(len(command.trail) - 1):
-            p1 = command.trail[i]
-            p2 = command.trail[i + 1]
-            x1, y1 = int(p1[0] * width), int(p1[1] * height)
-            x2, y2 = int(p2[0] * width), int(p2[1] * height)
-            cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 255), 3)   # 黃色線
+        for stroke in command.trail:          # 外層:每一筆
+            if len(stroke) < 2:
+                continue                       # 這筆少於兩點,連不成線
+            for i in range(len(stroke) - 1):   # 內層:這筆內部連點
+                p1, p2 = stroke[i], stroke[i + 1]
+                x1, y1 = int(p1[0] * width), int(p1[1] * height)
+                x2, y2 = int(p2[0] * width), int(p2[1] * height)
+                cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 255), 3)
