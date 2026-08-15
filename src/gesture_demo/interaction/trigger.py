@@ -20,7 +20,7 @@ class PinchTrigger(Interaction):
         command = RenderCommand(event_type=RenderEventType.NONE, event_position=(0.0, 0.0)) # 確保任何情況下都有狀態
 
         if is_pinching and not self.was_pinching:
-            command = RenderCommand(event_type=RenderEventType.CLICK, event_position=state.hand_position)
+            command = RenderCommand(event_type=RenderEventType.CLICK, event_position=state.index_tip)
 
         self.was_pinching = is_pinching
         return command
