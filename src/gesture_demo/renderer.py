@@ -3,6 +3,7 @@ from src.gesture_demo.camera import Camera
 from src.gesture_demo.detector import HandDetector
 from src.gesture_demo.contracts import HandLandmarks
 from src.gesture_demo.smoother import Smoother
+from src.gesture_demo.recognizer import recognize
 
 HAND_CONNECTIONS = [
     (0, 1), (1, 2), (2, 3), (3, 4),        # 拇指
@@ -37,6 +38,19 @@ def draw_landmarks(frame, hands: HandLandmarks):
 
     return frame
 
+def draw_gesture_text(frame, state):
+    if not state.hand_detected:
+        return frame
+
+    # 手勢文字(不管哪個手勢,同一行,文字動態取自 enum)
+    text = state.gesture.value.upper()
+    cv2.putText(frame, text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+
+    # 捏合值(第二行,y 往下)
+    pinch_text = f"pinch: {state.pinch_strength:.2f}"
+    cv2.putText(frame, pinch_text, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+
+    return frame
 if __name__ == "__main__":
     from src.gesture_demo.camera import Camera
 
@@ -48,7 +62,9 @@ if __name__ == "__main__":
         frame = cam.read()
         hands = detector.detect(frame)
         hands = smoother.smooth(hands)
+        state = recognize(hands)
         frame = draw_landmarks(frame, hands)
+        frame = draw_gesture_text(frame, state)
 
         cv2.imshow("Render Test", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
