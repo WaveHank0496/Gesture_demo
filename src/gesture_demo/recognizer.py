@@ -49,6 +49,8 @@ def recognize_gesture(landmarks) -> Gesture:
     # 伸直的手指數量 == 1,且食指是伸直的
     if sum(fingers.values()) == 1 and fingers["index"]:
         return Gesture.POINT
+    if fingers["index"] and fingers["middle"] and not fingers["ring"] and not fingers["pinky"]:
+        return Gesture.YEAH
     return Gesture.NONE                     # 其他情況不歸類
 
 def recognize(hands: list[HandLandmarks]) -> GestureState:

@@ -7,6 +7,7 @@ class Gesture(Enum):
     FIST = "fist"
     OPEN = "open"
     POINT = "point"
+    YEAH = "yeah"
 
 @dataclass
 class GestureState:

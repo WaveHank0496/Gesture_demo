@@ -41,6 +41,9 @@ class App:
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
                 break
+            elif key == ord('c'):
+                if hasattr(self.interaction, "clear"):
+                    self.interaction.clear()
             elif key != 255 and chr(key) in self.interactions:      # 先確認有按鍵,才 chr
                 self.interaction = self.interactions[chr(key)]
 

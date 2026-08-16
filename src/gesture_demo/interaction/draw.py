@@ -28,3 +28,4 @@ class DrawPen(Interaction):
 
     def clear(self):
         self.strokes = []
+        self.was_drawing = False
