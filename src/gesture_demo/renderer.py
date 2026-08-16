@@ -110,7 +110,7 @@ class Renderer:
         name = command.image_name
         # 快取:讀過的圖直接用,沒讀過才讀檔
         if name not in self.image_cache:
-            path = os.path.join("assets", name)
+            path = os.path.join("assets", "images", name)
             img = cv2.imread(path)
             if img is None:                 # 圖檔不存在或讀失敗
                 self.image_cache[name] = None
