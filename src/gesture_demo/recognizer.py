@@ -57,6 +57,8 @@ def recognize_gesture(landmarks) -> Gesture:
         return Gesture.THUMB_UP
     if sum(fingers.values()) == 3 and fingers["index"] and fingers["middle"] and fingers["ring"]:
         return Gesture.THREE
+    if sum(fingers.values()) == 2 and fingers["thumb"] and fingers["pinky"]:
+        return Gesture.PHONE
     return Gesture.NONE                     # 其他情況不歸類
 
 def recognize(hands: list[HandLandmarks]) -> GestureState:
