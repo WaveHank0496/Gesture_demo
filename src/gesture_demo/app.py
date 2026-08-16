@@ -9,7 +9,6 @@ from src.gesture_demo.interaction.grab import GrabDrag
 from src.gesture_demo.interaction.draw import DrawPen
 from src.gesture_demo.contracts import RenderEventType
 
-
 class App:
     def __init__(self):
         # 建立所有模組(組裝線的「零件準備」)
@@ -17,9 +16,12 @@ class App:
         self.detector = HandDetector()
         self.smoother = Smoother(alpha=0.5)
         #interactions
-        # self.interaction = PinchTrigger()
-        # self.interaction = GrabDrag()
-        self.interaction = DrawPen()
+        self.interactions = {
+            '1' : PinchTrigger(),
+            '2' : GrabDrag(),
+            '3' : DrawPen(),
+        }
+        self.interaction = self.interactions['1']
         self.renderer = Renderer()
 
     def run(self):
@@ -36,8 +38,11 @@ class App:
             frame = self.renderer.render(frame, hands, state, command)
             cv2.imshow("Gesture Demo", frame)
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
                 break
+            elif key != 255 and chr(key) in self.interactions:      # 先確認有按鍵,才 chr
+                self.interaction = self.interactions[chr(key)]
 
         self.camera.release()
         cv2.destroyAllWindows()

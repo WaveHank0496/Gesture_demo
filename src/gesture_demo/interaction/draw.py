@@ -7,7 +7,6 @@ class DrawPen(Interaction):
         self.strokes = []
         self.was_drawing = False    # 上一幀是否在畫
 
-
     def process(self, state: GestureState) -> RenderCommand:
         is_drawing = state.hand_detected and state.gesture == Gesture.POINT
         
