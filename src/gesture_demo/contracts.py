@@ -8,6 +8,9 @@ class Gesture(Enum):
     OPEN = "open"
     POINT = "point"
     YEAH = "yeah"
+    THUMB_UP = "thumb_up"
+    THREE = "three"
+    FOUR = "four"
 
 @dataclass
 class GestureState:
@@ -34,3 +37,4 @@ class RenderCommand:
     event_type: RenderEventType
     event_position: tuple[float, float]
     trail: list[tuple[float, float]] = None 
+    image_name: str = None

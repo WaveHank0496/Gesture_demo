@@ -8,6 +8,7 @@ from src.gesture_demo.interaction.trigger import PinchTrigger
 from src.gesture_demo.interaction.grab import GrabDrag
 from src.gesture_demo.interaction.draw import DrawPen
 from src.gesture_demo.contracts import RenderEventType
+from src.gesture_demo.interaction.image_show import GestureImage
 
 class App:
     def __init__(self):
@@ -20,6 +21,7 @@ class App:
             '1' : PinchTrigger(),
             '2' : GrabDrag(),
             '3' : DrawPen(),
+            '4' : GestureImage(),
         }
         self.interaction = self.interactions['1']
         self.renderer = Renderer()
@@ -35,7 +37,8 @@ class App:
             command = self.interaction.process(state)
 
             # 渲染
-            frame = self.renderer.render(frame, hands, state, command)
+            mode_name = type(self.interaction).__name__
+            frame = self.renderer.render(frame, hands, state, command, mode_name)
             cv2.imshow("Gesture Demo", frame)
 
             key = cv2.waitKey(1) & 0xFF

@@ -27,6 +27,7 @@ def compute_pinch(landmarks):
 
 # 五根指尖編號
 FINGER_TIPS = {
+    "thumb": 4,
     "index": 8,
     "middle": 12,
     "ring": 16,
@@ -40,9 +41,10 @@ def recognize_gesture(landmarks) -> Gesture:
     }
 
     # 看組合對應哪個手勢
-    if not any(fingers.values()):          # 四指全彎
+    if not any(fingers.values()):          # 五指全彎
         return Gesture.FIST
-    if all(fingers.values()):              # 四指全伸
+    #if all(fingers.values()):              # 五指全伸
+    if fingers["index"] and fingers["middle"] and fingers["ring"] and fingers["pinky"]:
         return Gesture.OPEN
     #if fingers["index"] and not fingers["middle"] and not fingers["ring"] and not fingers["pinky"]:
     #    return Gesture.POINT               # 只有食指伸
@@ -51,6 +53,10 @@ def recognize_gesture(landmarks) -> Gesture:
         return Gesture.POINT
     if fingers["index"] and fingers["middle"] and not fingers["ring"] and not fingers["pinky"]:
         return Gesture.YEAH
+    if sum(fingers.values()) == 1 and fingers["thumb"]:
+        return Gesture.THUMB_UP
+    if sum(fingers.values()) == 3 and fingers["index"] and fingers["middle"] and fingers["ring"]:
+        return Gesture.THREE
     return Gesture.NONE                     # 其他情況不歸類
 
 def recognize(hands: list[HandLandmarks]) -> GestureState:

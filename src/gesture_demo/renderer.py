@@ -1,4 +1,5 @@
 import cv2
+import os
 from src.gesture_demo.contracts import HandLandmarks, GestureState, RenderCommand, RenderEventType
 
 HAND_CONNECTIONS = [
@@ -17,8 +18,9 @@ class Renderer:
     def __init__(self):
         self.click_pos = None      # 最近 CLICK 的位置(像素)
         self.click_timer = 0       # 還要畫幾幀
+        self.image_cache = {}
 
-    def render(self, frame, hands, state, command):
+    def render(self, frame, hands, state, command, mode_name):
         # 1. 畫手骨架
         self._draw_landmarks(frame, hands)
         # 2. 畫手勢文字
@@ -29,6 +31,10 @@ class Renderer:
         self._draw_box(frame, command)   
         # 3. 畫線
         self._draw_trail(frame, command)
+        # 判斷哪一個interation
+        self._draw_mode(frame, mode_name)
+        # 放圖片
+        self._draw_image(frame, command)
         return frame
 
     def _draw_landmarks(self, frame, hands):
@@ -45,6 +51,10 @@ class Renderer:
                 cv2.line(frame, points[a], points[b], (255, 255, 255), 2)
             for point in points:
                 cv2.circle(frame, point, 5, (0, 255, 0), -1)
+
+    def _draw_mode(self, frame, mode_name):
+        cv2.putText(frame, f"Mode: {mode_name}", (10, 130),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200, 200, 0), 2)
 
     def _draw_gesture_text(self, frame, state):
         if not state.hand_detected:
@@ -92,3 +102,28 @@ class Renderer:
                 x1, y1 = int(p1[0] * width), int(p1[1] * height)
                 x2, y2 = int(p2[0] * width), int(p2[1] * height)
                 cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 255), 3)
+
+    def _draw_image(self, frame, command):
+        if not command.image_name:          # 沒有要顯示的圖
+            return
+
+        name = command.image_name
+        # 快取:讀過的圖直接用,沒讀過才讀檔
+        if name not in self.image_cache:
+            path = os.path.join("assets", name)
+            img = cv2.imread(path)
+            if img is None:                 # 圖檔不存在或讀失敗
+                self.image_cache[name] = None
+            else:
+                img = cv2.resize(img, (300, 200))   # 縮到 200x200
+                self.image_cache[name] = img
+        img = self.image_cache[name]
+        if img is None:                     # 讀失敗就不畫
+            return
+
+        # 貼到右上角
+        h, w = img.shape[:2]
+        frame_h, frame_w = frame.shape[:2]
+        x1 = frame_w - w - 10               # 右上角,離右邊 10px
+        y1 = 10
+        frame[y1:y1+h, x1:x1+w] = img       # 覆蓋那塊區域
