@@ -3,9 +3,9 @@ from src.gesture_demo.contracts import GestureState, RenderCommand, RenderEventT
 from src.gesture_demo.sound import SoundPlayer
 
 GESTURE_IMAGES = {
-    Gesture.FIST: "fist.jpg",  
-    Gesture.OPEN: "open.jpg",
-    Gesture.POINT: "point.jpg",
+    Gesture.FIST: "oiiiaiii.jpg",  
+    Gesture.OPEN: "kenchiana.jpg",
+    Gesture.POINT: "weiweimonmon.jpg",
     Gesture.YEAH: "yeah.jpg",
     Gesture.THUMB_UP: "thumb_up.jpg",
     Gesture.THREE: "three.jpg",
