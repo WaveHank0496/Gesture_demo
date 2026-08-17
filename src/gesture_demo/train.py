@@ -17,7 +17,7 @@ class GestureMLP(nn.Module):
         # 結構:63 → 128 → (ReLU) → 64 → (ReLU) → 8
         # 用 nn.Linear(輸入, 輸出) 和 nn.ReLU()
         self.net = nn.Sequential(
-            nn.Linear(63, 128),
+            nn.Linear(42, 128),
             nn.ReLU(),
             nn.Linear(128, 64),
             nn.ReLU(),

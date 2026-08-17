@@ -25,15 +25,16 @@ class GestureDataset(Dataset):
             #    提示:欄位順序是 x0,y0,z0, x1,y1,z1, ...
             landmarks = []
             for i in range(21):
-                landmarks.append((row[f"x{i}"], row[f"y{i}"], row[f"x{i}"]))
+                # landmarks.append((row[f"x{i}"], row[f"y{i}"], row[f"z{i}"])) 後來發現 z 座標在搞
+                landmarks.append((row[f"x{i}"], row[f"y{i}"]))
 
             # 2. 呼叫 normalize() 得到正規化後的 21 個點
             normalized = normalize(landmarks)
 
             # 3. 把 21 個點攤平成一個長度 63 的 list/array
             flat = []
-            for (x, y, z) in normalized:
-                flat.extend([x, y, z])
+            for (x, y) in normalized:
+                flat.extend([x, y])
 
             # 4. 把字串 label 轉成整數索引
             label_idx = LABEL_TO_IDX[row["label"]]

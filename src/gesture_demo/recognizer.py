@@ -71,10 +71,11 @@ class GestureRecognizer:
         print(f"[Recognizer] 切換到: {self.mode}")
 
     def _predict_by_model(self, landmarks) -> Gesture:
-        normalized = normalize(landmarks)
+        landmarks_2d = [(p[0], p[1]) for p in landmarks]   # 先砍成 2D
+        normalized = normalize(landmarks_2d)
         flat = []
-        for (x, y, z) in normalized:
-            flat.extend([x, y, z])
+        for (x, y) in normalized:
+            flat.extend([x, y])
         x = torch.tensor(np.array([flat]), dtype=torch.float32)
         with torch.no_grad():
             idx = self.model(x).argmax(dim=1).item()
