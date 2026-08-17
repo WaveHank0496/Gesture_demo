@@ -4,7 +4,7 @@ import torch
 from src.gesture_demo.contracts import HandLandmarks, GestureState, Gesture
 from src.gesture_demo.features import normalize
 from src.gesture_demo.dataset import GESTURE_LABELS
-from src.gesture_demo.train import GestureMLP
+from src.gesture_demo.model import GestureMLP
 
 # 幾何計算
 def distance(p1, p2):

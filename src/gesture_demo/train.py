@@ -7,25 +7,7 @@ from src.gesture_demo.dataset import GestureDataset
 from src.gesture_demo.session_split import session_train_test_split
 from sklearn.metrics import confusion_matrix, classification_report
 from src.gesture_demo.dataset import GESTURE_LABELS
-
-
-# ── 模型 ──────────────────────────────────
-class GestureMLP(nn.Module):
-    def __init__(self):
-        super().__init__()
-        # TODO 你填:定義三層 Linear + ReLU
-        # 結構:63 → 128 → (ReLU) → 64 → (ReLU) → 8
-        # 用 nn.Linear(輸入, 輸出) 和 nn.ReLU()
-        self.net = nn.Sequential(
-            nn.Linear(42, 128),
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, 8),
-        )
-
-    def forward(self, x):
-        return self.net(x)
+from src.gesture_demo.model import GestureMLP
 
 
 # ── 主程式 ────────────────────────────────
