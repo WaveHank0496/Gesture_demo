@@ -6,22 +6,24 @@ GESTURE_IMAGES = {
     Gesture.FIST: "oiiiaiii.jpg",  
     Gesture.OPEN: "kenchiana.jpg",
     Gesture.POINT: "weiweimonmon.jpg",
-    Gesture.YEAH: "yeah.jpg",
-    Gesture.THUMB_UP: "thumb_up.jpg",
-    Gesture.THREE: "three.jpg",
+    Gesture.YEAH: "emotional_damage.jpg",
+    Gesture.THUMB_UP: "fuhhhh.jpg",
+    Gesture.THREE: "cowbae.jpg",
     Gesture.FOUR: "four.jpg",
-    Gesture.PHONE: "phone.jpg"
+    Gesture.PHONE: "phone.jpg",
+    Gesture.OK: "ok.jpg"
 }
 
 GESTURE_SOUNDS = {
     Gesture.FIST: "fist.mp3",           # 喔咿咿阿伊
     Gesture.OPEN: "open.mp3",           # 肯洽拿
     Gesture.POINT: "point.mp3",         # 葳葳孟孟
-    Gesture.YEAH: "yeah.mp3",           # 尬電
+    Gesture.YEAH: "emotional_damage.mp3",           # 尬電
     Gesture.THUMB_UP: "thumb_up.mp3",   # fuhhhhh
-    Gesture.THREE: "three.mp3",         # 靠北三小
+    Gesture.THREE: "cowbae.mp3",         # 靠北三小
     Gesture.FOUR: "four.mp3",           
-    Gesture.PHONE: "phone.mp3"          # your phone ringing
+    Gesture.PHONE: "phone.mp3",          # your phone ringing
+    Gesture.OK: "ok.mp3"
 }
 
 

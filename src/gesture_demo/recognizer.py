@@ -1,6 +1,12 @@
 import math
+import numpy as np
+import torch
 from src.gesture_demo.contracts import HandLandmarks, GestureState, Gesture
+from src.gesture_demo.features import normalize
+from src.gesture_demo.dataset import GESTURE_LABELS
+from src.gesture_demo.train import GestureMLP
 
+# 幾何計算
 def distance(p1, p2):
     # p1, p2 是 (x, y, z) tuple,算它們的 2D 距離(只用 x, y) 直接算歐氏距離
     return math.hypot(p1[0]-p2[0], p1[1]-p2[1])
@@ -33,6 +39,87 @@ FINGER_TIPS = {
     "ring": 16,
     "pinky": 20,
 }
+
+def recognize_gesture_by_rules(landmarks) -> Gesture:
+    fingers = {name: is_finger_extended(landmarks, tid) for name, tid in FINGER_TIPS.items()}
+    if not any(fingers.values()):
+        return Gesture.FIST
+    if fingers["index"] and fingers["middle"] and fingers["ring"] and fingers["pinky"]:
+        return Gesture.OPEN
+    if sum(fingers.values()) == 1 and fingers["index"]:
+        return Gesture.POINT
+    if fingers["index"] and fingers["middle"] and not fingers["ring"] and not fingers["pinky"]:
+        return Gesture.YEAH
+    if sum(fingers.values()) == 1 and fingers["thumb"]:
+        return Gesture.THUMB_UP
+    if sum(fingers.values()) == 3 and fingers["index"] and fingers["middle"] and fingers["ring"]:
+        return Gesture.THREE
+    if sum(fingers.values()) == 2 and fingers["thumb"] and fingers["pinky"]:
+        return Gesture.PHONE
+    return Gesture.NONE
+
+# ── 主辨識器:雙模式 ──────────────────────────
+class GestureRecognizer:
+    def __init__(self, model_path="models/gesture_mlp.pth"):
+        self.mode = "ml"                         # "ml" 或 "rules"
+        self.model = GestureMLP()
+        self.model.load_state_dict(torch.load(model_path))
+        self.model.eval()
+
+    def toggle(self):
+        self.mode = "rules" if self.mode == "ml" else "ml"
+        print(f"[Recognizer] 切換到: {self.mode}")
+
+    def _predict_by_model(self, landmarks) -> Gesture:
+        normalized = normalize(landmarks)
+        flat = []
+        for (x, y, z) in normalized:
+            flat.extend([x, y, z])
+        x = torch.tensor(np.array([flat]), dtype=torch.float32)
+        with torch.no_grad():
+            idx = self.model(x).argmax(dim=1).item()
+        return Gesture(GESTURE_LABELS[idx])
+
+    def predict_gesture(self, landmarks) -> Gesture:
+        if self.mode == "ml":
+            return self._predict_by_model(landmarks)
+        else:
+            return recognize_gesture_by_rules(landmarks)
+
+    def recognize(self, hands: list[HandLandmarks]) -> GestureState:
+        if not hands:
+            return GestureState(
+                hand_detected=False, gesture=Gesture.NONE,
+                pinch_strength=0.0, hand_position=(0.0, 0.0), index_tip=(0.0, 0.0),
+            )
+        landmarks = hands[0].landmarks
+        return GestureState(
+            hand_detected=True,
+            gesture=self.predict_gesture(landmarks),
+            pinch_strength=compute_pinch(landmarks),
+            hand_position=(landmarks[0][0], landmarks[0][1]),
+            index_tip=(landmarks[8][0], landmarks[8][1]),
+        )
+
+
+# ── 模組層級單例 + 轉發函式 ──────────────────
+_recognizer = GestureRecognizer()
+
+
+def recognize(hands: list[HandLandmarks]) -> GestureState:
+    return _recognizer.recognize(hands)
+
+
+def toggle_mode():                # 對外暴露切換,給 app.py 呼叫
+    _recognizer.toggle()
+
+
+def get_mode() -> str:            # 讓 app 能顯示現在是哪個模式
+    return _recognizer.mode
+
+
+"""
+# 原邏輯
 def recognize_gesture(landmarks) -> Gesture:
     # 判斷食指到小指四根的伸直狀態
     fingers = {
@@ -89,3 +176,4 @@ def recognize(hands: list[HandLandmarks]) -> GestureState:
         hand_position=hand_pos,
         index_tip=index_tip,
     )
+"""

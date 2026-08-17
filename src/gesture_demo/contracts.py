@@ -12,6 +12,7 @@ class Gesture(Enum):
     THREE = "three"
     FOUR = "four"
     PHONE = "phone"
+    OK = "ok"
 
 @dataclass
 class GestureState:

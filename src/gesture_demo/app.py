@@ -9,6 +9,7 @@ from src.gesture_demo.interaction.grab import GrabDrag
 from src.gesture_demo.interaction.draw import DrawPen
 from src.gesture_demo.contracts import RenderEventType
 from src.gesture_demo.interaction.image_show import GestureImage
+from src.gesture_demo.recognizer import recognize, toggle_mode, get_mode
 
 class App:
     def __init__(self):
@@ -39,6 +40,8 @@ class App:
             # 渲染
             mode_name = type(self.interaction).__name__
             frame = self.renderer.render(frame, hands, state, command, mode_name)
+            cv2.putText(frame, f"recognizer: {get_mode()}", (10, 170),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 255), 2)
             cv2.imshow("Gesture Demo", frame)
 
             key = cv2.waitKey(1) & 0xFF
@@ -49,6 +52,8 @@ class App:
                     self.interaction.clear()
             elif key != 255 and chr(key) in self.interactions:      # 先確認有按鍵,才 chr
                 self.interaction = self.interactions[chr(key)]
+            elif key == ord('m'):
+                toggle_mode()
 
         self.camera.release()
         cv2.destroyAllWindows()
