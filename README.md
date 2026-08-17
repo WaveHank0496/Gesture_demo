@@ -1,46 +1,63 @@
 # Gesture Demo — 即時手勢互動系統
 
-一個以 **MediaPipe** 為基礎的即時手部互動系統：偵測手部關節點、辨識手勢、並提供三種可即時切換的互動模式（捏合觸發、抓取拖動、空中畫筆）。純 CPU 即可運行，不需 GPU。
-
-這個專案的重點**不在功能數量，而在架構設計**。整套系統以「單向資料管線 + 明確資料契約」為核心，做到六個模組彼此解耦、互動策略可插拔、第三方函式庫被隔離在單一模組。以下文件會著重說明這些設計決策背後的理由。
+一個以攝影機即時辨識手勢、並觸發多種互動效果的系統。核心特色是**用機器學習模型取代手寫幾何規則來辨識手勢**,並透過乾淨的架構設計,讓這次替換「只改動一個模組、其餘完全不動」。系統支援一鍵切換「規則式」與「ML」兩種辨識器,可直接肉眼對比兩者差異。
 
 ---
 
-## Demo 一覽
+## 這個專案在做什麼
 
-| 模式 | 觸發手勢 | 效果 |
-|------|---------|------|
-| 捏合觸發 (Trigger) | 拇指 + 食指捏合 | 在捏合位置出現一次點擊回饋（紅圈） |
-| 抓取拖動 (Grab) | 捏住畫面上的方塊並移動 | 方塊跟隨手移動，放開即固定 |
-| 空中畫筆 (Draw) | 食指指向 (POINT) | 指尖經過的軌跡連成線，多筆獨立 |
+攝影機捕捉手部 → 抽出 21 個關節點 → 辨識手勢 → 觸發對應互動(捏合觸發、抓取拖曳、手勢畫筆、手勢觸發圖片音效)。
 
-**操作按鍵**：`1` / `2` / `3` 切換三種互動 · `c` 清空畫布 · 張開手掌亦可清空畫布 · `q` 離開
+整條管線是單向資料流,模組之間僅透過三個資料契約(dataclass)溝通,彼此不知道對方的內部實作:
+
+```
+camera → detector → smoother → recognizer → interaction → renderer
+```
+
+| 模組 | 職責 |
+|---|---|
+| `camera` | 讀取攝影機影格 |
+| `detector` | 用 MediaPipe Hand Landmarker 抽出 21 個關節點,MediaPipe 只在此檔出現 |
+| `smoother` | 對關節點做 EMA 平滑,減少抖動 |
+| `recognizer` | 判斷手勢類別 + 計算幾何量測(捏合強度、指尖位置) |
+| `interaction` | 策略模式,可切換多種互動邏輯 |
+| `renderer` | 把手骨架、手勢、互動效果畫回畫面 |
+
+資料契約(`contracts.py`):`HandLandmarks`、`GestureState`、`RenderCommand`。
 
 ---
 
-## 系統架構
+## 架構:用 ML 替換規則式
 
-整個系統是一條 **單向資料管線 (unidirectional pipeline)**：每一幀影像進來，依序經過六個模組加工，最後輸出到畫面。
+專案原本用**手寫幾何規則**辨識手勢(判斷每根手指是否伸直)。這種做法對「手的角度」很敏感——例如比讚時,拇指必須大致垂直於畫面才判得準,手一旋轉就失效。
+
+為了解決這個問題,辨識邏輯被替換成一個**自己訓練的手勢分類模型**。關鍵在於:
+
+- **只改動 `recognizer.py` 內部**,上游的 `app`、`interaction`、`renderer` 一行都沒動。
+- 因為所有模組都只依賴 `GestureState` 這個契約,不在乎它裡面的 `gesture` 欄位是「規則算出來的」還是「模型預測的」。
+- 對外仍保持 `recognize(hands)` 的函式介面不變(內部改用有狀態的 class + 模組層級單例轉發),因此連 `app.py` 的呼叫方式都不需要改。
+
+這驗證了契約隔離架構的價值:**核心邏輯可以整個抽換,系統其餘部分無感。**
 
 ```
                     ┌─────────────────────────────────────────────┐
-                    │                   App (主程式)                │
-                    │        持有所有模組、驅動主迴圈、處理按鍵         │
+                    │                   App (主程式)              │
+                    │        持有所有模組、驅動主迴圈、處理按鍵      │
                     └─────────────────────────────────────────────┘
                                         │
     每一幀影像 (frame)                    │  依序呼叫
                                         ▼
   ┌──────────┐   frame    ┌──────────┐  list[HandLandmarks]  ┌──────────┐
   │  camera  │──────────▶│ detector │──────────────────────▶│ smoother │
-  │ 攝影機來源 │            │ 手部偵測  │                        │  平滑濾波 │
-  └──────────┘            └──────────┘                        └──────────┘
+  │ 攝影機來源│            │ 手部偵測  │                       │ 平滑濾波 │
+  └──────────┘            └──────────┘                       └──────────┘
    讀取影像                 MediaPipe                          EMA 去抖動
    水平翻轉                 (唯一碰 MediaPipe 的模組)                  │
                                                                     │ list[HandLandmarks]
                                                                     ▼
   ┌──────────┐  RenderCommand  ┌─────────────┐  GestureState  ┌────────────┐
-  │ renderer │◀───────────────│ interaction │◀──────────────│ recognizer │
-  │  渲染輸出 │                 │  互動策略    │                │  手勢辨識   │
+  │ renderer │◀───────────────│ interaction │◀────────────── │ recognizer │
+  │  渲染輸出 │                 │  互動策略    │                │  手勢辨識  │
   └──────────┘                 └─────────────┘                └────────────┘
    畫骨架 / 手勢文字             策略模式：三種可插拔              幾何規則辨識手勢
    互動視覺回饋                 Trigger / Grab / Draw            計算捏合程度
@@ -49,134 +66,147 @@
      螢幕輸出
 ```
 
-模組之間傳遞的不是彼此的內部物件，而是三個定義好的**資料契約 (data contracts)**：
 
-- **`HandLandmarks`** — detector 的輸出，代表「一隻手」的 21 個關節點座標。多隻手用 `list[HandLandmarks]` 表達。
-- **`GestureState`** — recognizer 的輸出，系統的「語意層」：目前手勢、捏合程度、關鍵座標。
-- **`RenderCommand`** — interaction 的輸出，描述「發生了什麼事件」，供 renderer 繪製。
+### 雙模式切換
+
+執行時按 `m` 可即時切換「規則式」與「ML」兩種辨識器,方便直接對比。實測在「比讚並旋轉手腕」這類情境下,ML 模式明顯比規則式穩定。
 
 ---
 
-## 關鍵設計決策
+## 機器學習部分:完整流程
 
-這一節是這份文件的重點——說明每個決策的**理由**，而非只描述「做了什麼」。
+手勢辨識模型走過一遍完整的 ML 流程,從零開始:
 
-### 1. 單向管線 + 資料契約：讓模組解耦
+### 1. 資料採集
 
-管線上每一段只依賴前一段的「輸出資料格式」，不依賴它「如何算出來」。detector 吐出 `HandLandmarks`，下游只認得這個格式，完全不需要知道它是 MediaPipe 算的、還是別的模型。
+- 重用系統既有的 `camera → detector`,寫一支採集腳本錄下帶標籤的關節點資料。
+- 輸入特徵是 **21 個關節點座標(x, y, z 共 63 維)**,而非原始影像。原因:detector 已經完成從雜亂像素中定位手、抽出關節點這段最困難的工作;直接使用關節點,資料需求小、CPU 可訓練、且天生對背景與光線免疫。
+- 錄製時遵守「控制變因」原則:每個手勢分數個 session,分別涵蓋位置、距離、角度的變化,並放慢動作以確保 detector 每一影格都能穩定定位。
+- 每筆資料額外記錄 `session_id`,標記它來自哪一次連續錄製。
 
-**帶來的好處**：任何一段都能獨立替換與測試。例如可以手動塞一個假的 `GestureState` 給互動模組做單元測試，完全不需開攝影機。
+目前涵蓋 8 種手勢:`fist`、`open`、`point`、`yeah`、`thumb_up`、`three`、`phone`、`ok`。
 
-### 2. 依賴隔離：MediaPipe 只出現在 detector
+### 2. 正規化(讓模型對位置/大小免疫)
 
-整個專案只有 `detector.py` 一個檔案接觸 MediaPipe。這讓第三方函式庫的變動被限縮在單一模組。
+MediaPipe 輸出的 0~1 座標只消除了「螢幕解析度」這個變因,並未消除手在畫面的**位置**與**遠近**。正規化(`features.py`)進一步處理:
 
-**實際驗證**：開發過程中，MediaPipe 從 legacy Solutions API 換成新版 Tasks API（因套件升級到 1.0 移除了舊 API），改動只發生在 `detector.py`，其他模組一行未動。
+- **平移不變**:所有點減去手腕座標,讓手腕成為原點。
+- **縮放不變**:所有點除以 palm_size(手腕到中指根的 3D 距離),消除遠近造成的尺度差異。
 
-### 3. 策略模式：三種互動可插拔
+這一步是模型能對角度/位置 robust 的核心——同一個手勢不論在畫面何處、離鏡頭多遠,正規化後的特徵向量都幾乎一致。
 
-三種互動（Trigger / Grab / Draw）輸入輸出完全相同（收 `GestureState`、吐 `RenderCommand`），只有中間邏輯不同。透過抽象基底類別 `Interaction` 定義共同介面，各互動實作它，主程式想掛哪個就掛哪個。
+### 3. 資料切分(避免 data leakage)
 
-**實際驗證**：新增第二、第三種互動時，`app.py` 只改兩行（import + 建立物件），detector / smoother / recognizer / renderer 全部不動。切換互動時，呼叫端 `self.interaction.process(state)` 也完全不變。
+因為資料是連續影格,相鄰影格幾乎相同。若隨機切分 train/test,同一段動作的影格會同時落入兩邊,造成測試準確率虛高。
 
-### 4. 向後相容的契約演進
+因此採用**分層 + 按 session 切分**(`session_split.py`):
 
-畫筆功能需要 `RenderCommand` 攜帶「一整串軌跡」，但原本它只有單一座標。解法是**新增一個有預設值的欄位** `trail=None`：新功能用得到它，舊的 Trigger / Grab 不傳它也照常運作。這是在不破壞現有功能下擴充契約的標準做法。
+- 對每個手勢各自切分,保證每個手勢在 train/test 都有代表(分層)。
+- 以整個 session 為單位分配,同一段錄製不會被拆散(防洩漏)。
 
-### 5. EMA 平滑：穩定與延遲的權衡
+### 4. 模型與訓練
 
-MediaPipe 逐幀獨立推論會產生高頻抖動。平滑模組使用**指數移動平均 (EMA)**：`平滑值 = α × 新值 + (1−α) × 前一次平滑值`，時間與空間複雜度皆為 **O(1)**（只需保留前一次結果）。
+- 一個小型 MLP(63 → 128 → 64 → 8),以 ReLU 為激活函數,輸出層不接 softmax(交由 `CrossEntropyLoss` 內部處理)。
+- 參數量僅數萬個,CPU 上即可快速訓練,無需 GPU。
+- 訓練後將權重存為 `state_dict`,供辨識器載入。
 
-單一參數 `α` 控制核心權衡：α 大 → 跟手但仍抖；α 小 → 穩定但延遲高。這是即時系統無法迴避的取捨，沒有免費的午餐。
+### 5. 評估
 
-### 6. 邊緣偵測：狀態轉變而非狀態本身
+- 以 held-out 的 test set 計算準確率與混淆矩陣。
+- 目前 **test accuracy 約 93%**。
 
-捏合觸發若寫成「捏合程度 > 門檻就觸發」，捏著不放時會每幀狂觸發。正確做法是偵測「從沒捏 → 捏下去」的**瞬間**（本幀捏合 + 上幀未捏合），因此每個互動需要記住上一幀的狀態。畫筆的「開新筆」也用同一模式。
+---
+
+## 已知限制
+
+以誠實為原則,如實記錄目前的弱點:
+
+- **`thumb_up` 傾向成為「過度吸收」的類別**:部分 `phone` 與 `fist` 的樣本會被誤判為 `thumb_up`。
+- 根本原因是這幾個手勢的幾何差異主要落在**拇指或小指單一根手指**的伸直狀態,在特徵空間中彼此接近;而拇指的姿態又特別容易受手掌朝向影響。
+- 這較可能是**資料涵蓋不足**的問題(這幾類的拇指角度多樣性不夠),而非模型能力不足——其餘手勢的辨識接近完美,顯示模型結構本身沒有問題。
+- 後續可透過針對這幾類補錄更多角度的資料來改善。
+
+此外,模型每一影格獨立預測,類別偶爾會有跳動;目前尚未加入預測層級的時序平滑。
+
+---
+
+## 環境需求
+
+- Python 3.12
+- 攝影機
+- 相依套件見 `requirements.txt`(主要為 PyTorch(CPU)、MediaPipe、OpenCV、pygame、NumPy、pandas、scikit-learn)
+
+---
+
+## 安裝與執行
+
+```bash
+# 建立並啟用虛擬環境
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # macOS / Linux
+
+# 安裝相依套件
+pip install -r requirements.txt
+```
+
+需另外準備 MediaPipe 的手部模型檔 `hand_landmarker.task`,放在專案根目錄。
+
+### 執行主程式
+
+```bash
+py -m src.gesture_demo.app
+```
+
+操作:
+
+| 按鍵 | 功能 |
+|---|---|
+| `1` `2` `3` `4` | 切換互動模式(捏合觸發 / 抓取 / 畫筆 / 手勢圖片音效) |
+| `m` | 切換辨識器(規則式 / ML) |
+| `c` | 清除當前互動狀態(如清空畫筆) |
+| `q` | 離開 |
+
+---
+
+## 自己訓練模型(選用)
+
+專案已附上訓練好的模型(`models/gesture_mlp.pth`),可直接執行。若想自行收集資料並重新訓練:
+
+```bash
+# 1. 採集資料(按數字鍵選手勢、空白鍵開始/暫停、s 存檔、q 離開)
+py -m src.gesture_demo.collectData.collect_data
+
+# 2. 訓練並評估(會輸出 loss、test accuracy、混淆矩陣,並存出模型)
+py -m src.gesture_demo.train
+```
+
+資料會存於 `data/`(未納入版控)。
 
 ---
 
 ## 專案結構
 
 ```
-Gesture_demo/
-├── src/
-│   └── gesture_demo/
-│       ├── contracts.py        # 三個資料契約 + Gesture / RenderEventType 列舉
-│       ├── camera.py           # 攝影機來源 (含水平翻轉)
-│       ├── detector.py         # MediaPipe 手部偵測 (唯一碰 MediaPipe 的模組)
-│       ├── smoother.py         # EMA 平滑濾波
-│       ├── recognizer.py       # 幾何規則辨識手勢 + 捏合程度
-│       ├── renderer.py         # 渲染骨架、手勢文字、互動視覺回饋
-│       ├── app.py              # 主程式：組裝六個模組、驅動主迴圈
-│       └── interaction/        # 互動策略 (策略模式)
-│           ├── base.py         #   Interaction 抽象基底類別 (共同介面)
-│           ├── trigger.py      #   捏合觸發
-│           ├── grab.py         #   抓取拖動
-│           └── draw.py         #   空中畫筆
-├── tests/                      # 單元測試
-│   ├── test_recognizer.py      #   distance() 幾何函式
-│   └── test_trigger.py         #   捏合觸發的邊緣偵測邏輯
-├── requirements.txt
-└── README.md
+src/gesture_demo/
+├── app.py              # 主迴圈,串接所有模組
+├── camera.py           # 攝影機
+├── detector.py         # MediaPipe 手部偵測(MediaPipe 唯一出現處)
+├── smoother.py         # EMA 平滑
+├── recognizer.py       # 手勢辨識(規則式 + ML 雙模式)+ 幾何量測
+├── features.py         # 正規化
+├── dataset.py          # PyTorch Dataset,資料前處理
+├── session_split.py    # 分層 + 按 session 切分
+├── train.py            # 模型定義、訓練、評估
+├── contracts.py        # 資料契約(dataclass)
+├── collectData/
+│   └── collect_data.py # 資料採集腳本
+└── interaction/        # 各種互動策略(策略模式)
+    ├── base.py
+    ├── trigger.py      # 捏合觸發
+    ├── grab.py         # 抓取拖曳
+    ├── draw.py         # 手勢畫筆
+    └── image_show.py   # 手勢觸發圖片音效
 ```
 
----
-
-## 環境需求與安裝
-
-- **Python 3.12**（MediaPipe 目前不支援 3.13）
-- 一個可用的攝影機
-- 純 CPU 即可運行
-
-```bash
-# 建立虛擬環境 (Python 3.12)
-py -3.12 -m venv .venv
-.venv\Scripts\activate          # Windows
-# source .venv/bin/activate     # macOS / Linux
-
-# 安裝依賴
-pip install -r requirements.txt
-
-# 下載 MediaPipe 手部模型
-curl -o hand_landmarker.task https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
-```
-
----
-
-## 執行
-
-一律從**專案根目錄**、以模組方式執行（確保 import 路徑一致）：
-
-```bash
-python -m src.gesture_demo.app
-```
-
-執行後對著鏡頭比手，用 `1` / `2` / `3` 切換互動、`c` 清空、`q` 離開。
-
-### 執行測試
-
-```bash
-python -m tests.test_recognizer
-python -m tests.test_trigger
-```
-
-測試完全以假資料驗證純邏輯（例如餵一連串假的 `GestureState` 給捏合觸發，斷言「捏一次只觸發一次、捏著不重複、放開再捏能再觸發」），不需開啟攝影機。
-
----
-
-## 已知限制與未來擴充
-
-以下為刻意保留的擴充空間——優先做完核心的穩定與完整，而非堆疊功能。
-
-- **多手互動**：偵測層已支援多手（可畫多隻手骨架），但語意/互動層目前聚焦單手。多手互動需要穩定的手部追蹤（最近鄰匹配），可於未來加入。
-- **多手平滑**：目前手數變動的那一幀會重置平滑。完整版需以手部追蹤將前後幀的手一一對應。
-- **更多手勢**：目前用幾何規則辨識（伸指組合 + 捏合距離）。可繼續加規則，或改接 MediaPipe Gesture Recognizer / 自訓模型——因辨識邏輯隔離在 `recognizer.py`，替換不影響其他模組。
-- **更穩健的手勢判斷**：目前的伸指判斷對手部大幅旋轉較敏感，未來可改用向量夾角。
-- **特效層**：`RenderCommand` 已設計為「描述事件」而非「執行繪製」，未來可新增 effects 模組訂閱同一份 `RenderCommand` 做進階視覺，互動邏輯無需改動。
-- **當前模式提示**：畫面可加上「目前互動模式」的文字提示，改善展示體驗。
-
----
-
-## 技術棧
-
-Python 3.12 · MediaPipe (Tasks API) · OpenCV · dataclasses / Enum / ABC
+> 註:`assets/`(互動用的圖片與音效)未納入版控。如需完整互動效果,請自行於 `assets/images/` 與 `assets/sounds/` 放入對應素材。
