@@ -11,7 +11,14 @@ GESTURE_IMAGES = {
     Gesture.THREE: "cowbae.jpg",
     Gesture.FOUR: "four.jpg",
     Gesture.PHONE: "phone.jpg",
-    Gesture.OK: "ok.jpg"
+    Gesture.OK: "ok.jpg",
+    # ── 新手勢:assets/images/ 放好圖之後把下面對應那行取消註解 ──
+    # Gesture.SEVEN: "seven.jpg",
+    # Gesture.EIGHT: "eight.jpg",
+    # Gesture.GUN: "gun.jpg",
+    # Gesture.SPLIT: "split.jpg",
+    # Gesture.ROCK: "rock.jpg",
+    # Gesture.MIDDLE: "middle.jpg",
 }
 
 GESTURE_SOUNDS = {
@@ -23,7 +30,14 @@ GESTURE_SOUNDS = {
     Gesture.THREE: "cowbae.mp3",         # 靠北三小
     Gesture.FOUR: "four.mp3",           
     Gesture.PHONE: "phone.mp3",          # your phone ringing
-    Gesture.OK: "ok.mp3"
+    Gesture.OK: "ok.mp3",
+    # ── 新手勢:assets/sounds/ 放好音檔之後把下面對應那行取消註解 ──
+    # Gesture.SEVEN: "seven.mp3",
+    # Gesture.EIGHT: "eight.mp3",
+    # Gesture.GUN: "gun.mp3",
+    # Gesture.SPLIT: "split.mp3",
+    # Gesture.ROCK: "rock.mp3",
+    # Gesture.MIDDLE: "middle.mp3",
 }
 
 

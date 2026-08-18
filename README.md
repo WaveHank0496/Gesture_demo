@@ -80,18 +80,20 @@ camera → detector → smoother → recognizer → interaction → renderer
 ### 1. 資料採集
 
 - 重用系統既有的 `camera → detector`,寫一支採集腳本錄下帶標籤的關節點資料。
-- 輸入特徵是 **21 個關節點座標(x, y, z 共 63 維)**,而非原始影像。原因:detector 已經完成從雜亂像素中定位手、抽出關節點這段最困難的工作;直接使用關節點,資料需求小、CPU 可訓練、且天生對背景與光線免疫。
+- 輸入特徵是 **21 個關節點座標**,而非原始影像。採集時連 z 一起存(63 欄),但訓練時只取 x, y(42 維)—— 實測 MediaPipe 的 z 是相對深度、雜訊大,加進去反而拖累準確率。原因:detector 已經完成從雜亂像素中定位手、抽出關節點這段最困難的工作;直接使用關節點,資料需求小、CPU 可訓練、且天生對背景與光線免疫。
 - 錄製時遵守「控制變因」原則:每個手勢分數個 session,分別涵蓋位置、距離、角度的變化,並放慢動作以確保 detector 每一影格都能穩定定位。
 - 每筆資料額外記錄 `session_id`,標記它來自哪一次連續錄製。
 
-目前涵蓋 8 種手勢:`fist`、`open`、`point`、`yeah`、`thumb_up`、`three`、`phone`、`ok`。
+目前定義 15 種手勢:`fist`、`open`、`point`、`yeah`、`thumb_up`、`three`、`phone`、`ok`(已訓練),以及 `four`、`seven`、`eight`、`gun`、`split`、`rock`、`middle`(新增,錄製中)。
+
+新增一個手勢要動哪些檔案、跑哪些步驟,整理在 [docs/add-new-gesture-manual.md](docs/add-new-gesture-manual.md)。
 
 ### 2. 正規化(讓模型對位置/大小免疫)
 
 MediaPipe 輸出的 0~1 座標只消除了「螢幕解析度」這個變因,並未消除手在畫面的**位置**與**遠近**。正規化(`features.py`)進一步處理:
 
 - **平移不變**:所有點減去手腕座標,讓手腕成為原點。
-- **縮放不變**:所有點除以 palm_size(手腕到中指根的 3D 距離),消除遠近造成的尺度差異。
+- **縮放不變**:所有點除以 palm_size(手腕到中指根的距離),消除遠近造成的尺度差異。
 
 這一步是模型能對角度/位置 robust 的核心——同一個手勢不論在畫面何處、離鏡頭多遠,正規化後的特徵向量都幾乎一致。
 
@@ -106,7 +108,7 @@ MediaPipe 輸出的 0~1 座標只消除了「螢幕解析度」這個變因,並�
 
 ### 4. 模型與訓練
 
-- 一個小型 MLP(63 → 128 → 64 → 8),以 ReLU 為激活函數,輸出層不接 softmax(交由 `CrossEntropyLoss` 內部處理)。
+- 一個小型 MLP(42 → 128 → 64 → 類別數),以 ReLU 為激活函數,輸出層不接 softmax(交由 `CrossEntropyLoss` 內部處理)。輸出維度直接綁 `len(GESTURE_LABELS)`,新增手勢時不用手動改。
 - 參數量僅數萬個,CPU 上即可快速訓練,無需 GPU。
 - 訓練後將權重存為 `state_dict`,供辨識器載入。
 

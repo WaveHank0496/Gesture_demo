@@ -6,8 +6,16 @@ from src.gesture_demo.features import normalize
 
 
 # label 字串 <-> 整數索引的對應。模型輸出的是整數類別,要有固定映射。
-GESTURE_LABELS = ["fist", "open", "point", "yeah", "thumb_up", "three", "phone", "ok"]
+# ⚠️ 新手勢一律「加在尾端」,不要插在中間 —— 這個 list 的位置就是模型的類別編號,
+#    插在中間會讓後面所有手勢的編號位移,舊資料的意義全部跑掉。
+GESTURE_LABELS = [
+    # ── 舊的 8 類(已有訓練資料)──
+    "fist", "open", "point", "yeah", "thumb_up", "three", "phone", "ok",
+    # ── 新增的 7 類(2026-08 新增,需重新錄資料 + 重新訓練)──
+    "four", "seven", "eight", "gun", "split", "rock", "middle",
+]
 LABEL_TO_IDX = {name: i for i, name in enumerate(GESTURE_LABELS)}
+NUM_CLASSES = len(GESTURE_LABELS)
 
 
 class GestureDataset(Dataset):

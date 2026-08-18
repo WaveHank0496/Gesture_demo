@@ -59,7 +59,7 @@ def main():
 
     with torch.no_grad():                    # 評估不需要梯度
         for X_batch, y_batch in test_loader:
-            pred = model(X_batch)            # (batch, 8) 的 logits
+            pred = model(X_batch)            # (batch, 類別數) 的 logits
             pred_labels = pred.argmax(dim=1)  # 取每列分數最高的那類 → 預測類別
 
             correct += (pred_labels == y_batch).sum().item()
@@ -71,7 +71,9 @@ def main():
     print(f"\ntest accuracy: {correct/total:.4f}")
 
     print("\n混淆矩陣(列=真實, 行=預測):")
-    cm = confusion_matrix(all_labels, all_preds)
+    # 明確指定 labels:某一類還沒資料 / 沒被切進 test 時,矩陣才不會少一列一行
+    all_idx = list(range(len(GESTURE_LABELS)))
+    cm = confusion_matrix(all_labels, all_preds, labels=all_idx)
     # 印表頭
     print("真實\\預測  " + " ".join(f"{name[:5]:>6}" for name in GESTURE_LABELS))
     for i, name in enumerate(GESTURE_LABELS):
@@ -79,7 +81,9 @@ def main():
         print(f"{name[:8]:>8}  {row}")
 
     print("\n每類詳細指標:")
-    print(classification_report(all_labels, all_preds, target_names=GESTURE_LABELS))
+    print(classification_report(all_labels, all_preds,
+                                labels=all_idx, target_names=GESTURE_LABELS,
+                                zero_division=0))
 
     # ── 存模型 ──────────────────
     import os

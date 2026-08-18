@@ -63,10 +63,23 @@ class GestureRecognizer:
     def __init__(self, model_path="models/gesture_mlp.pth"):
         self.mode = "ml"                         # "ml" 或 "rules"
         self.model = GestureMLP()
-        self.model.load_state_dict(torch.load(model_path))
-        self.model.eval()
+        try:
+            self.model.load_state_dict(torch.load(model_path))
+            self.model.eval()
+        except (FileNotFoundError, RuntimeError) as e:
+            # 最常見的原因:新增手勢後類別數變了,舊的 .pth 對不上 → 要重新訓練。
+            # 這裡不讓整個 app 掛掉,先退回規則模式(但規則模式只認得舊的幾個手勢)。
+            print(f"[Recognizer] 載入 {model_path} 失敗:{e}")
+            print(f"[Recognizer] 目前類別數 = {len(GESTURE_LABELS)}。"
+                  "若是剛新增手勢,請先錄資料再跑 train 重新產生 .pth。")
+            print("[Recognizer] 暫時切換到規則模式(rules)。")
+            self.model = None
+            self.mode = "rules"
 
     def toggle(self):
+        if self.model is None and self.mode == "rules":
+            print("[Recognizer] 模型沒載入成功,無法切到 ml 模式(請先重新訓練)")
+            return
         self.mode = "rules" if self.mode == "ml" else "ml"
         print(f"[Recognizer] 切換到: {self.mode}")
 

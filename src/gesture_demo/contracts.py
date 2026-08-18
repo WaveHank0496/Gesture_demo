@@ -8,10 +8,16 @@ class Gesture(Enum):
     OPEN = "open"
     POINT = "point"
     YEAH = "yeah"
-    THUMB_UP = "thumb_up"
     THREE = "three"
     FOUR = "four"
+    THUMB_UP = "thumb_up"
     PHONE = "phone"
+    SEVEN = "seven"
+    EIGHT = "eight"
+    GUN = "gun"
+    SPLIT = "split"
+    ROCK = "rock"
+    MIDDLE = "middle"
     OK = "ok"
 
 @dataclass
