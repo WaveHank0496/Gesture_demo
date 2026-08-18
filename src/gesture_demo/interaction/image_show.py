@@ -8,36 +8,36 @@ GESTURE_IMAGES = {
     Gesture.POINT: "weiweimonmon.jpg",
     Gesture.YEAH: "emotional_damage.jpg",
     Gesture.THUMB_UP: "fuhhhh.jpg",
-    Gesture.THREE: "cowbae.jpg",
-    Gesture.FOUR: "four.jpg",
+    Gesture.THREE: "coldwater.jpg",
+    Gesture.FOUR: "Uncle.jpg",
     Gesture.PHONE: "phone.jpg",
-    Gesture.OK: "ok.jpg",
-    # ── 新手勢:assets/images/ 放好圖之後把下面對應那行取消註解 ──
-    # Gesture.SEVEN: "seven.jpg",
-    # Gesture.EIGHT: "eight.jpg",
-    # Gesture.GUN: "gun.jpg",
-    # Gesture.SPLIT: "split.jpg",
-    # Gesture.ROCK: "rock.jpg",
-    # Gesture.MIDDLE: "middle.jpg",
+    Gesture.OK: "piyan.jpg",
+  
+    Gesture.SEVEN: "sixseven.jpg",
+    Gesture.EIGHT: "pull_into_trash.jpg",
+    Gesture.GUN: "president_goshot.jpg",
+    Gesture.SPLIT: "rapgod.jpg",
+    Gesture.ROCK: "rickroll.jpg",
+    Gesture.MIDDLE: "cowbae.jpg",
 }
 
 GESTURE_SOUNDS = {
-    Gesture.FIST: "fist.mp3",           # 喔咿咿阿伊
-    Gesture.OPEN: "open.mp3",           # 肯洽拿
-    Gesture.POINT: "point.mp3",         # 葳葳孟孟
-    Gesture.YEAH: "emotional_damage.mp3",           # 尬電
-    Gesture.THUMB_UP: "thumb_up.mp3",   # fuhhhhh
-    Gesture.THREE: "cowbae.mp3",         # 靠北三小
-    Gesture.FOUR: "four.mp3",           
-    Gesture.PHONE: "phone.mp3",          # your phone ringing
-    Gesture.OK: "ok.mp3",
-    # ── 新手勢:assets/sounds/ 放好音檔之後把下面對應那行取消註解 ──
-    # Gesture.SEVEN: "seven.mp3",
-    # Gesture.EIGHT: "eight.mp3",
-    # Gesture.GUN: "gun.mp3",
-    # Gesture.SPLIT: "split.mp3",
-    # Gesture.ROCK: "rock.mp3",
-    # Gesture.MIDDLE: "middle.mp3",
+    Gesture.FIST: "fist.mp3",               # 喔咿咿阿伊
+    Gesture.OPEN: "open.mp3",               # 肯洽拿
+    Gesture.POINT: "point.mp3",             # 葳葳孟孟
+    Gesture.YEAH: "emotional_damage.mp3",   # 尬電
+    Gesture.THUMB_UP: "thumb_up.mp3",       # fuhhhhh
+    Gesture.THREE: "bao-chi-ding-wang.mp3",         
+    Gesture.FOUR: "Uncle_weAreInAccident_uncle.mp3",           
+    Gesture.PHONE: "phone.mp3",             # your phone ringing
+    Gesture.OK: "piyan.mp3",
+
+    Gesture.SEVEN: "six-seven.mp3",
+    Gesture.EIGHT: "pull_into_trash_truck.mp3",
+    Gesture.GUN: "president_you_inherent_rrrrr.mp3",
+    Gesture.SPLIT: "rapgod.mp3",
+    Gesture.ROCK: "rickroll.mp3",
+    Gesture.MIDDLE: "cowbae.mp3",
 }
 
 
