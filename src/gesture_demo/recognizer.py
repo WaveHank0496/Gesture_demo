@@ -40,6 +40,8 @@ FINGER_TIPS = {
     "pinky": 20,
 }
 
+CONF_THRESHOLD = 0.7
+
 def recognize_gesture_by_rules(landmarks) -> Gesture:
     fingers = {name: is_finger_extended(landmarks, tid) for name, tid in FINGER_TIPS.items()}
     if not any(fingers.values()):
@@ -91,8 +93,12 @@ class GestureRecognizer:
             flat.extend([x, y])
         x = torch.tensor(np.array([flat]), dtype=torch.float32)
         with torch.no_grad():
-            idx = self.model(x).argmax(dim=1).item()
-        return Gesture(GESTURE_LABELS[idx])
+            logits = self.model(x)
+            probs = torch.softmax(logits, dim=1)
+            conf, idx = probs.max(dim=1)
+            if conf.item() < CONF_THRESHOLD:     # 定義一個區間 如果真的辨識不出來就NONE
+                return Gesture.NONE
+        return Gesture(GESTURE_LABELS[idx.item()])
 
     def predict_gesture(self, landmarks) -> Gesture:
         if self.mode == "ml":

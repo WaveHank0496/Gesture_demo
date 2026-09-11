@@ -115,7 +115,7 @@ class Renderer:
             if img is None:                 # 圖檔不存在或讀失敗
                 self.image_cache[name] = None
             else:
-                img = cv2.resize(img, (300, 200))   # 縮到 200x200
+                img = cv2.resize(img, (300, 200))   # 縮到 300x200
                 self.image_cache[name] = img
         img = self.image_cache[name]
         if img is None:                     # 讀失敗就不畫

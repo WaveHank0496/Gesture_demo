@@ -24,7 +24,7 @@ class GestureDataset(Dataset):
         df: 有 label, session_id, 和 63 個座標欄的 DataFrame。
         建立時一次性 normalize 好所有資料。
         """
-        self.X = []   # 每筆是 normalize 後攤平的 63 維向量
+        self.X = []   # 每筆是 normalize 後攤平的 42 維向量 (原本是63 但把z拿掉了)
         self.y = []   # 每筆是整數 label
 
         for _, row in df.iterrows():

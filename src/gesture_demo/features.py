@@ -22,7 +22,7 @@ def normalize(landmarks: list[tuple[float, float, float]]) -> list[tuple[float, 
     points = np.array(landmarks)          # shape: (21, 2)
     wrist = points[0]                     # shape: (2,)
 
-    palm_size = euclidean_distance_3d(landmarks[0], landmarks[9])
+    palm_size = euclidean_distance_2d(landmarks[0], landmarks[9])
     if palm_size < 1e-6:                  # 防呆:避免除以接近 0(手部偵測異常時)
         palm_size = 1e-6
 
