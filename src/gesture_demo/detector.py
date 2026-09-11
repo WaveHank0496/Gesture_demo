@@ -10,7 +10,7 @@ class HandDetector:
         base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')      # 泛型模型檔位置
         options = vision.HandLandmarkerOptions(                                         # 手部模型  
             base_options=base_options, 
-            num_hands=2,                            # 先用一隻手
+            num_hands=1,                            # 先用一隻手
             running_mode=vision.RunningMode.VIDEO   # 用VIDEO mode
         )  
         self.landmarker = vision.HandLandmarker.create_from_options(options)                   # 按照設定把detector造出來
