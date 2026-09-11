@@ -42,15 +42,21 @@ def _file_sha256(path: str) -> str:
 
 
 def _git_commit() -> str:
-    """記下 code 的版本。有未 commit 的修改會標 -dirty。"""
+    """記下 code 的版本。有未 commit 的修改會標 -dirty。
+
+    models/ 要排除掉:訓練本身就會寫出 .pth 和這份 .json,
+    不排除的話每次訓練都會把自己弄髒,-dirty 就永遠都在、失去意義。
+    這裡的 -dirty 只代表「原始碼跟 commit 不一致」。
+    """
     try:
         commit = subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"], text=True, stderr=subprocess.DEVNULL
         ).strip()
-        dirty = subprocess.check_output(
-            ["git", "status", "--porcelain"], text=True, stderr=subprocess.DEVNULL
+        status = subprocess.check_output(
+            ["git", "status", "--porcelain", "--", ".", ":(exclude)models"],
+            text=True, stderr=subprocess.DEVNULL,
         ).strip()
-        return f"{commit}-dirty" if dirty else commit
+        return f"{commit}-dirty" if status else commit
     except Exception:
         return "unknown"
 
