@@ -12,6 +12,7 @@ GESTURE_IMAGES = {
     Gesture.FOUR: "Uncle.jpg",
     Gesture.PHONE: "phone.jpg",
     Gesture.OK: "piyan.jpg",
+    #Gesture.OK: "goddamn.jpg"
   
     Gesture.SEVEN: "sixseven.jpg",
     Gesture.EIGHT: "pull_into_trash.jpg",
@@ -31,6 +32,7 @@ GESTURE_SOUNDS = {
     Gesture.FOUR: "Uncle_weAreInAccident_uncle.mp3",           
     Gesture.PHONE: "phone.mp3",             # your phone ringing
     Gesture.OK: "piyan.mp3",
+    #Gesture.OK: "goddamnnnn.mp3",
 
     Gesture.SEVEN: "six-seven.mp3",
     Gesture.EIGHT: "pull_into_trash_truck.mp3",
