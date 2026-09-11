@@ -84,7 +84,7 @@ camera → detector → smoother → recognizer → interaction → renderer
 - 錄製時遵守「控制變因」原則:每個手勢分數個 session,分別涵蓋位置、距離、角度的變化,並放慢動作以確保 detector 每一影格都能穩定定位。
 - 每筆資料額外記錄 `session_id`,標記它來自哪一次連續錄製。
 
-目前定義 15 種手勢:`fist`、`open`、`point`、`yeah`、`thumb_up`、`three`、`phone`、`ok`(已訓練),以及 `four`、`seven`、`eight`、`gun`、`split`、`rock`、`middle`(新增,錄製中)。
+目前定義 15 種手勢:`fist`、`open`、`point`、`yeah`、`thumb_up`、`three`、`phone`、`ok`(最初的 8 類),以及 `four`、`seven`、`eight`、`gun`、`split`、`rock`、`middle`(後續新增)。15 類皆已錄製並完成訓練。
 
 
 ### 2. 正規化(讓模型對位置/大小免疫)
@@ -107,11 +107,57 @@ MediaPipe 輸出的 0~1 座標只消除了「螢幕解析度」這個變因,並�
 
 ### 4. 模型與訓練
 
-- 一個小型 MLP(42 → 128 → 64 → 類別數),以 ReLU 為激活函數,輸出層不接 softmax(交由 `CrossEntropyLoss` 內部處理)。輸出維度直接綁 `len(GESTURE_LABELS)`,新增手勢時不用手動改。
+- 一個小型 MLP(42 → 128 → 64 → 類別數),以 ReLU 為激活函數,輸出層不接 softmax(交由 `CrossEntropyLoss` 內部處理)。輸出維度直接綁 `len(GESTURE_LABELS)`,新增手勢時不用手動改。模型定義獨立在 `model.py`,訓練腳本與辨識器共用同一份。
 - 參數量僅數萬個,CPU 上即可快速訓練,無需 GPU。
 - 訓練後將權重存為 `state_dict`,供辨識器載入。
+- 超參數集中在 `train.py` 的 `CONFIG` 一個 dict 裡(`seed` / `epochs` / `batch_size` / `lr` / `test_ratio`),`train.py` 和 `train.ipynb` 共用這一份,兩邊不會各跑一套設定。
 
-### 5. 評估
+### 5. 可複現性(同樣的指令要跑出同樣的模型)
+
+訓練裡有三個獨立的隨機來源,漏掉任何一個,同樣的指令就會產出不同的模型:
+
+| 隨機來源 | 位置 |
+|---|---|
+| train/test 切分 | `session_split.py`,收 `seed` 參數 |
+| 模型權重初始化 | `nn.Linear` 的預設初始化,抽**全域** torch RNG |
+| DataLoader 洗牌順序 | `shuffle=True`,同樣抽**全域** torch RNG |
+
+`seeding.py` 把三者集中管理,訓練開始前呼叫一次 `set_seed()`(必須在建立 model 和 DataLoader **之前**)。
+
+一個容易漏掉的細節:後兩項共用同一個全域 RNG,所以它們會互相影響——只要改了模型結構(例如 128 → 256),抽掉的隨機數個數就變了,洗牌順序也跟著飄,於是分不清準確率的變化是來自模型還是來自洗牌。因此 DataLoader 一律吃 `make_loader_generator()` 給的**獨立** generator,把兩者解耦。
+
+Notebook 另有一個坑:cell 可以亂序重跑。所以「讀資料」與「建模型」兩個 cell 開頭都各自重設一次種子,單獨重跑其中一個也會得到一樣的結果。
+
+實測(同一份 code 連跑兩次):
+
+```
+修好後   RUN 1: loss = 0.2578029254   acc = 0.8938520064
+         RUN 2: loss = 0.2578029254   acc = 0.8938520064   ← 逐位元一致
+
+沒種子時 RUN 1: loss = 0.2735952327   acc = 0.8936065775
+         RUN 2: loss = 0.2535955849   acc = 0.8837894220   ← 差約 1%
+```
+
+**種子只保證「同樣的 code + 同樣的資料 + 同樣的設定」跑出同樣結果**,它不會幫你記住那三個「同樣」當時是什麼。`gestures.csv` 會隨著補錄資料一直長,`.pth` 檔本身看不出是用哪一版資料、哪個 commit 訓的。因此每次存模型時,會在旁邊寫一份同名的 `models/gesture_mlp.json`(以下為格式範例):
+
+```json
+{
+  "created_at": "2026-09-11T12:28:01",
+  "source": "train.py",
+  "config": { "seed": 42, "epochs": 40, "batch_size": 64, "lr": 0.001, "test_ratio": 0.25 },
+  "test_accuracy": 0.962,
+  "git_commit": "31ccf0e",
+  "data_sha256": "e6052f4a8121...",
+  "gesture_labels": ["fist", "open", "..."],
+  "torch_version": "2.13.0+cpu"
+}
+```
+
+`data_sha256` 認資料版本、`git_commit` 認 code 版本(有未 commit 的修改會標 `-dirty`)、`config` 認設定。三個對得上,就複現得出來。
+
+同理,`requirements.txt` 鎖完整版本清單也是複現的一環——不同版本的 PyTorch 預設初始化方式可能不同,種子一樣也未必得到一樣的權重。
+
+### 6. 評估
 
 - 以 held-out 的 test set 計算準確率與混淆矩陣。
 - 目前 **test accuracy 約 96.2%**(15 類)。從 8 類擴到 15 類後準確率不降反升。
@@ -137,6 +183,7 @@ MediaPipe 輸出的 0~1 座標只消除了「螢幕解析度」這個變因,並�
 - Python 3.12
 - 攝影機
 - 相依套件見 `requirements.txt`(主要為 PyTorch(CPU)、MediaPipe、OpenCV、pygame、NumPy、pandas、scikit-learn)
+- `requirements.txt` 鎖定完整版本清單,是可複現訓練的一部分。檔案開頭的 `--extra-index-url https://download.pytorch.org/whl/cpu` 是必要的:`torch==2.13.0+cpu` 的 `+cpu` 是 local version,只存在 PyTorch 官方 index,PyPI 上找不到。
 
 ---
 
@@ -183,6 +230,12 @@ py -m src.gesture_demo.collectData.collect_data
 py -m src.gesture_demo.train
 ```
 
+訓練會產出兩個檔案:`models/gesture_mlp.pth`(權重)和 `models/gesture_mlp.json`(這次訓練的設定、資料指紋、git commit、準確率)。
+
+要調參就改 `train.py` 裡的 `CONFIG`,不要散在各處改——那份 dict 會整個寫進 json,事後才查得到某個模型是什麼設定訓出來的。固定 `seed` 的前提下重跑同樣的設定,結果會逐位元一致。
+
+`train.ipynb` 是同一套流程的 notebook 版本,適合互動式調參;它直接 `from src.gesture_demo.train import CONFIG, build_loaders`,和 script 共用設定。
+
 資料會存於 `data/`(未納入版控)。
 
 ---
@@ -197,9 +250,12 @@ src/gesture_demo/
 ├── smoother.py         # EMA 平滑
 ├── recognizer.py       # 手勢辨識(規則式 + ML 雙模式)+ 幾何量測
 ├── features.py         # 正規化
-├── dataset.py          # PyTorch Dataset,資料前處理
+├── dataset.py          # PyTorch Dataset,資料前處理、GESTURE_LABELS
 ├── session_split.py    # 分層 + 按 session 切分
-├── train.py            # 模型定義、訓練、評估
+├── model.py            # 模型定義(GestureMLP)
+├── seeding.py          # 隨機種子集中管理,訓練可複現
+├── train.py            # 訓練、評估、存模型 + 訓練記錄
+├── train.ipynb         # 同一套流程的 notebook 版本(共用 train.py 的 CONFIG)
 ├── contracts.py        # 資料契約(dataclass)
 ├── collectData/
 │   └── collect_data.py # 資料採集腳本
