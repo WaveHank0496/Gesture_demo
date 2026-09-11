@@ -114,48 +114,128 @@ MediaPipe 輸出的 0~1 座標只消除了「螢幕解析度」這個變因,並�
 
 ### 5. 可複現性(同樣的指令要跑出同樣的模型)
 
-訓練裡有三個獨立的隨機來源,漏掉任何一個,同樣的指令就會產出不同的模型:
+#### 問題:同樣的指令,跑兩次結果不一樣
 
-| 隨機來源 | 位置 |
-|---|---|
-| train/test 切分 | `session_split.py`,收 `seed` 參數 |
-| 模型權重初始化 | `nn.Linear` 的預設初始化,抽**全域** torch RNG |
-| DataLoader 洗牌順序 | `shuffle=True`,同樣抽**全域** torch RNG |
+原本 `py -m src.gesture_demo.train` 連跑兩次,test accuracy 會差大約 1 個百分點。這讓所有調整都無法判斷:補錄了資料、accuracy 升了 0.5%,是資料真的有幫助,還是這次剛好抽到比較好的初始權重?分不出來,就等於沒有辦法改進模型。
 
-`seeding.py` 把三者集中管理,訓練開始前呼叫一次 `set_seed()`(必須在建立 model 和 DataLoader **之前**)。
+#### 原因:有三個隨機來源,原本只設了一個種子
 
-一個容易漏掉的細節:後兩項共用同一個全域 RNG,所以它們會互相影響——只要改了模型結構(例如 128 → 256),抽掉的隨機數個數就變了,洗牌順序也跟著飄,於是分不清準確率的變化是來自模型還是來自洗牌。因此 DataLoader 一律吃 `make_loader_generator()` 給的**獨立** generator,把兩者解耦。
+| 隨機來源 | 在哪裡發生 | 原本狀況 |
+|---|---|---|
+| train/test 切分 | `session_split.py` 用 `np.random.default_rng(seed)` 挑哪些 session 當 test | 已有種子(42) |
+| 模型權重初始化 | `nn.Linear` 的預設初始化,抽**全域** torch RNG | 沒設 → 每次起點都不同 |
+| DataLoader 洗牌順序 | `shuffle=True` 決定每個 epoch 的 batch 順序,也抽**全域** torch RNG | 沒設 → 每次梯度路徑都不同 |
 
-Notebook 另有一個坑:cell 可以亂序重跑。所以「讀資料」與「建模型」兩個 cell 開頭都各自重設一次種子,單獨重跑其中一個也會得到一樣的結果。
+主因是**權重初始化**。神經網路從隨機權重開始,梯度下降只能找到附近的局部最小值,起點不同就會停在不同的地方。洗牌順序是第二個因素:batch 的順序決定了梯度更新的先後,同樣會把模型帶到不同的終點。
 
-實測(同一份 code 連跑兩次):
+#### 做法:訓練開始前設定所有種子
+
+`seeding.py` 把三個來源集中在一個地方管理:
+
+```python
+from src.gesture_demo.seeding import set_seed
+
+set_seed(CONFIG["seed"])    # 必須在建立 model 和 DataLoader 之前
+```
+
+`set_seed()` 一次設好 `random`、`numpy`、`torch`、`torch.cuda` 和 `PYTHONHASHSEED`。這裡只用到 torch 和 numpy,其餘是為了以後加入資料增強之類的功能時不用再想起這件事。
+
+#### 兩個容易踩的坑
+
+**坑一:權重初始化和洗牌共用同一個全域 RNG。**
+
+它們都從同一個 `torch` 全域 RNG 抽數字,所以會互相影響。假設你把模型從 `42 → 128 → 64` 改成 `42 → 256 → 64`,初始化要抽的隨機數變多了,於是輪到 DataLoader 抽的時候,拿到的是完全不同的數字——**洗牌順序也跟著變了**。結果 accuracy 的變化裡混進了洗牌的影響,你分不清是模型結構的功勞還是運氣。
+
+解法是讓 DataLoader 用自己的 generator,不碰全域 RNG:
+
+```python
+train_loader = DataLoader(
+    train_ds,
+    batch_size=config["batch_size"],
+    shuffle=True,
+    generator=make_loader_generator(config["seed"]),   # 獨立的 RNG
+    worker_init_fn=seed_worker,
+)
+```
+
+這樣改模型結構時,洗牌順序固定不動,兩個變因就分開了。
+
+**坑二:notebook 的 cell 可以亂序重跑。**
+
+`train.ipynb` 裡你可能只重跑「建模型」那個 cell 來重新開始訓練。如果種子只設在最上面的 cell,這次重跑就會拿到一組全新的隨機權重。所以「讀資料」和「建模型」兩個 cell 開頭都各自呼叫一次 `set_seed()`,單獨重跑任何一個都會得到一樣的結果。
+
+另外 `train.ipynb` 直接 `from src.gesture_demo.train import CONFIG, build_loaders`,和 `train.py` 共用同一份設定。修改之前這兩邊是各寫一套的,notebook 跑 40 epochs、script 跑 30 epochs,本來就不可能對得起來。
+
+#### 驗證
+
+完整的 40 epochs 訓練,在乾淨的工作目錄上獨立跑兩次:
 
 ```
-修好後   RUN 1: loss = 0.2578029254   acc = 0.8938520064
-         RUN 2: loss = 0.2578029254   acc = 0.8938520064   ← 逐位元一致
-
-沒種子時 RUN 1: loss = 0.2735952327   acc = 0.8936065775
-         RUN 2: loss = 0.2535955849   acc = 0.8837894220   ← 差約 1%
+RUN 1: test accuracy = 0.9573    models/gesture_mlp.pth  sha256 4307c392...
+RUN 2: test accuracy = 0.9573    models/gesture_mlp.pth  sha256 4307c392...
 ```
 
-**種子只保證「同樣的 code + 同樣的資料 + 同樣的設定」跑出同樣結果**,它不會幫你記住那三個「同樣」當時是什麼。`gestures.csv` 會隨著補錄資料一直長,`.pth` 檔本身看不出是用哪一版資料、哪個 commit 訓的。因此每次存模型時,會在旁邊寫一份同名的 `models/gesture_mlp.json`(以下為格式範例):
+不只是準確率相同,連**產出的權重檔逐位元相同**。
+
+對照組(把 `set_seed()` 拿掉,為了快速比較只跑 2 epochs):
+
+```
+RUN 1: loss = 0.2735952327    acc = 0.8936065775
+RUN 2: loss = 0.2535955849    acc = 0.8837894220    ← 差約 1%
+```
+
+#### 種子還不夠:要記住三個「同樣」
+
+種子保證的是這件事:
+
+> 同樣的 code + 同樣的資料 + 同樣的設定 → 同樣的結果
+
+但種子**不會幫你記住那三個「同樣」當時是什麼**。三個月後打開 `models/gesture_mlp.pth`,它只是 62KB 的數字,你看不出它是用哪一版 `gestures.csv`、哪一版 code、幾個 epoch 訓出來的。而這個專案的資料是會長大的(目前 33809 筆,每次補錄 session 就變),code 也還在改。
+
+所以存模型時會在旁邊寫一份 `models/gesture_mlp.json`:
 
 ```json
 {
-  "created_at": "2026-09-11T12:28:01",
+  "created_at": "2026-09-11T12:50:47",
   "source": "train.py",
   "config": { "seed": 42, "epochs": 40, "batch_size": 64, "lr": 0.001, "test_ratio": 0.25 },
-  "test_accuracy": 0.962,
-  "git_commit": "31ccf0e",
-  "data_sha256": "e6052f4a8121...",
+  "test_accuracy": 0.957295,
+  "git_commit": "6848639",
+  "data_csv": "data/raw/gestures.csv",
+  "data_sha256": "e6052f4a8121abca0e0767d4cb0c4c23fe38cb7ec7fe6146fcb73687424a48eb",
   "gesture_labels": ["fist", "open", "..."],
   "torch_version": "2.13.0+cpu"
 }
 ```
 
-`data_sha256` 認資料版本、`git_commit` 認 code 版本(有未 commit 的修改會標 `-dirty`)、`config` 認設定。三個對得上,就複現得出來。
+三個欄位各自回答一個問題:
 
-同理,`requirements.txt` 鎖完整版本清單也是複現的一環——不同版本的 PyTorch 預設初始化方式可能不同,種子一樣也未必得到一樣的權重。
+| 欄位 | 回答什麼 | 怎麼產生 |
+|---|---|---|
+| `config` | 什麼設定?(seed、epochs、lr…) | 直接把 `CONFIG` 整份寫進去 |
+| `git_commit` | 哪一版 code? | `git rev-parse --short HEAD`。原始碼有未 commit 的修改會標 `-dirty`,提醒你這次的結果對不回任何 commit |
+| `data_sha256` | 哪一版資料? | 對 `gestures.csv` 算 SHA-256。檔名不會變但內容會長,只有雜湊認得出差異 |
+
+**實際會用到的場景**:你補錄三個 session 重新訓練,accuracy 從 95.7% 升到 97%。比對新舊兩份 json——`data_sha256` 不同而 `git_commit` 相同,就確定是資料的功勞;如果兩個都變了,那這次實驗混了兩個變因,結論不能採信。
+
+`git_commit` 的 dirty 判定會排除 `models/`,因為訓練本身就會寫出 `.pth` 和這份 `.json`,不排除的話每次訓練都把自己弄髒,`-dirty` 就永遠都在、失去意義。
+
+> 這份訓練記錄是**可選的**。它不影響訓練結果,拿掉也不會破壞可複現性——刪掉 `save_run_metadata()`、`_file_sha256()`、`_git_commit()` 三個函式和對應的 `hashlib` / `json` / `subprocess` / `datetime` import 即可。核心是 `set_seed()` 和 `CONFIG`,那兩個不能拿掉。
+
+#### 第三層:鎖住套件版本
+
+`requirements.txt` 鎖定完整的版本清單,這也是可複現的一環——不同版本的 PyTorch 預設初始化方式可能不同,種子一樣也未必得到一樣的權重。
+
+#### 檔案分工總表
+
+| 檔案 | 在可複現性裡的角色 |
+|---|---|
+| `seeding.py` | 種子集中管理:`set_seed()`、`make_loader_generator()`、`seed_worker()` |
+| `train.py` | `CONFIG`(唯一的超參數來源)、`build_loaders()`、寫出訓練記錄 |
+| `train.ipynb` | import `train.py` 的 `CONFIG` 和 `build_loaders`,不自己另寫一套 |
+| `session_split.py` | 切分自己收 `seed` 參數 |
+| `requirements.txt` | 鎖住套件版本 |
+| `models/gesture_mlp.json` | 每次訓練的來歷記錄(自動產生) |
 
 ### 6. 評估
 
