@@ -86,7 +86,6 @@ camera → detector → smoother → recognizer → interaction → renderer
 
 目前定義 15 種手勢:`fist`、`open`、`point`、`yeah`、`thumb_up`、`three`、`phone`、`ok`(已訓練),以及 `four`、`seven`、`eight`、`gun`、`split`、`rock`、`middle`(新增,錄製中)。
 
-新增一個手勢要動哪些檔案、跑哪些步驟,整理在 [docs/add-new-gesture-manual.md](docs/add-new-gesture-manual.md)。
 
 ### 2. 正規化(讓模型對位置/大小免疫)
 
